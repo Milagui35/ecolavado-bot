@@ -523,11 +523,15 @@ def procesar_evento(ev):
     """Procesa un evento 'messaging' del webhook de Instagram."""
     msg = ev.get("message")
     if not msg or msg.get("is_echo"):
+        log.info("Evento ignorado (%s)", "eco propio" if msg else "sin mensaje: " + ",".join(sorted(ev.keys())))
         return
     uid = str((ev.get("sender") or {}).get("id", ""))
+    log.info("Mensaje entrante de %s (texto=%s, adjuntos=%s)", uid, bool(msg.get("text")),
+             len(msg.get("attachments") or []))
     if not uid or ya_visto(msg.get("mid")):
         return
     if not CFG.bot_activo:
+        log.info("BOT_ACTIVO está apagado: no se responde")
         return
 
     with lock_de(uid):
@@ -548,6 +552,7 @@ def procesar_evento(ev):
             return  # reels, stickers, publicaciones compartidas: se ignoran
 
         if u["handoff_hasta"] > time.time():
+            log.info("Silencio por atención humana para %s", uid)
             return  # ya lo está atendiendo una persona
 
         guardar_msg(uid, "user", texto)
@@ -562,12 +567,21 @@ def procesar_evento(ev):
 
 
 def procesar_payload(payload):
+    eventos = []
     for entrada in payload.get("entry", []):
-        for ev in entrada.get("messaging", []):
-            try:
-                procesar_evento(ev)
-            except Exception:
-                log.exception("Error procesando evento")
+        eventos.extend(entrada.get("messaging", []))
+        for cambio in entrada.get("changes", []):  # formato alterno del webhook
+            if cambio.get("field") == "messages" and isinstance(cambio.get("value"), dict):
+                eventos.append(cambio["value"])
+            else:
+                log.info("Cambio ignorado (campo: %s)", cambio.get("field"))
+    if not eventos:
+        log.info("Webhook sin mensajes (objeto: %s)", payload.get("object"))
+    for ev in eventos:
+        try:
+            procesar_evento(ev)
+        except Exception:
+            log.exception("Error procesando evento")
 
 
 # --------------------------------------------------------------------------
@@ -620,6 +634,7 @@ class Handler(BaseHTTPRequestHandler):
             payload = json.loads(cuerpo.decode("utf-8"))
         except ValueError:
             return self._responder(400, b"json invalido")
+        log.info("Webhook recibido de Meta (%s bytes)", largo)
         self._responder(200, b"EVENT_RECEIVED")  # responder rápido a Meta
         threading.Thread(target=procesar_payload, args=(payload,), daemon=True).start()
 

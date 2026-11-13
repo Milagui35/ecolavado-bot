@@ -304,3 +304,12 @@ class TestAmbiguo(Base):
         self._montar([250.0, 300.0])
         r = bot.tool_cotizar({"servicio": "Edredon Queen", "cantidad": 1})
         self.assertFalse(r["ok"])
+
+
+class TestFormatoAlterno(Base):
+    def test_changes_messages_se_procesa(self):
+        self.claude_script = [self.texto("Hola, bienvenido.")]
+        ev = self.evento(texto="Hola")
+        bot.procesar_payload({"object": "instagram", "entry": [
+            {"changes": [{"field": "messages", "value": ev}]}]})
+        self.assertEqual(self.enviados[0][1], "Hola, bienvenido.")
