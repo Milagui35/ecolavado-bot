@@ -258,7 +258,7 @@ def metricas(con, desde, hasta, dias):
         "SELECT uid, MIN(ts) m FROM registro WHERE tipo = 'in' GROUP BY uid")}
     m = {
         "personas": set(), "entrantes": 0, "salientes": 0, "escalaciones": 0, "fuera_tema": 0,
-        "errores": 0, "cotizaciones": 0, "fuera_horario": 0, "tok_in": 0, "tok_out": 0,
+        "errores": 0, "cotizaciones": 0, "fuera_horario": 0, "tok_in": 0, "tok_out": 0, "tok_cache": 0,
         "media": 0, "limite": 0,
     }
     por_dia = defaultdict(set)
@@ -295,7 +295,8 @@ def metricas(con, desde, hasta, dias):
             m["limite"] += 1
         elif t == "uso":
             x = extra_de(f)
-            m["tok_in"] += int(x.get("i") or 0)
+            m["tok_in"] += int(x.get("i") or 0) + int(x.get("c") or 0) + int(x.get("w") or 0)
+            m["tok_cache"] += int(x.get("c") or 0)
             m["tok_out"] += int(x.get("o") or 0)
         elif t == "cotizo":
             x = extra_de(f)
@@ -538,7 +539,7 @@ def vista_resumen(con, periodo):
             f'{m["fuera_horario"]} mensajes con la lavandería cerrada'),
         kpi(n_fmt(m["fuera_tema"]), "Mensajes fuera de tema", f'{m["media"]} archivos, reels o fotos'),
         kpi(n_fmt(m["errores"]), "Fallos del bot", "respuestas que no se pudieron enviar"),
-        kpi(n_fmt(m["tok_in"] + m["tok_out"]), "Tokens de IA usados", f'{n_fmt(m["tok_in"])} entrada / {n_fmt(m["tok_out"])} salida'),
+        kpi(n_fmt(m["tok_in"] + m["tok_out"]), "Tokens de IA usados", f'{n_fmt(m["tok_in"])} entrada ({n_fmt(m["tok_cache"])} de caché) / {n_fmt(m["tok_out"])} salida'),
     ])
 
     hoy = datetime.now(HN_TZ).date()

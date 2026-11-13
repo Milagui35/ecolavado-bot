@@ -134,6 +134,14 @@ class TestFlujo(Base):
         self.assertEqual(self.enviados[2][1], bot.MSG_LIMITE)
         self.assertIn("+504 3227-5543", self.enviados[2][1])
 
+    def test_prompt_va_en_cache_y_la_hora_aparte(self):
+        self.claude_script = [self.texto("hola")]
+        bot.procesar_evento(self.evento(texto="hola"))
+        sistema = self.vistos_msgs[0][0]
+        self.assertEqual(sistema[0]["cache_control"], {"type": "ephemeral"})
+        self.assertNotIn("Fecha y hora actual", sistema[0]["text"])
+        self.assertIn("Fecha y hora actual", sistema[1]["text"])
+
     def test_bloqueado(self):
         bot.set_usuario("u1", bloqueado=1)
         bot.procesar_evento(self.evento())

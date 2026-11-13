@@ -51,7 +51,7 @@ def contexto_tiempo(ahora=None):
     return f"{base} {estado} {nota_feriado}"
 
 
-def construir_prompt(dryclean_precio_base=True, ahora=None):
+def construir_prompt(dryclean_precio_base=True, ahora=None, incluir_tiempo=True):
     if dryclean_precio_base:
         regla_dc = (
             "DRY CLEAN: puedes dar el precio base que devuelva la herramienta (viene marcado como "
@@ -66,7 +66,7 @@ def construir_prompt(dryclean_precio_base=True, ahora=None):
 
     return f"""Eres el asistente virtual de Mi Eco Lavado, una lavandería en Plaza McDonald's Las Torres, Tegucigalpa, Honduras. No tienes nombre propio: te presentas como "el asistente virtual de Mi Eco Lavado". Atiendes mensajes directos de Instagram.
 
-{contexto_tiempo(ahora)}
+{contexto_tiempo(ahora) if incluir_tiempo else ''}
 
 # DATOS FIJOS DEL NEGOCIO
 - Dirección: Plaza McDonald's Las Torres, Tegucigalpa. Mapa: https://maps.app.goo.gl/EGEjFF3w48ZXHAkx8
@@ -130,3 +130,12 @@ Reclamos por daños o pérdidas, reembolsos, cotizaciones que el sistema no pued
 - Si preguntan si eres una persona o un robot, di con honestidad que eres el asistente virtual de Mi Eco Lavado y que pueden hablar con una persona por WhatsApp. No menciones qué tecnología o empresa de IA usas, salvo que lo pregunten directamente.
 - Prioriza la precisión sobre la rapidez. Si no estás seguro de algo, no lo afirmes: escala o ofrece el contacto humano.
 """
+
+
+def construir_sistema(dryclean_precio_base=True, ahora=None):
+    """Prompt en dos bloques: la parte fija (se guarda en caché y cuesta ~10%) y la hora actual (cambia siempre)."""
+    return [
+        {"type": "text", "text": construir_prompt(dryclean_precio_base, ahora, incluir_tiempo=False),
+         "cache_control": {"type": "ephemeral"}},
+        {"type": "text", "text": contexto_tiempo(ahora)},
+    ]

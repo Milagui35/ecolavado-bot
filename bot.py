@@ -31,7 +31,7 @@ import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from prompt import ahora_hn, construir_prompt
+from prompt import ahora_hn, construir_prompt, construir_sistema
 
 log = logging.getLogger("ecolavado-bot")
 
@@ -547,13 +547,15 @@ def responder(uid, texto):
         msgs[-1]["content"] += "\n" + texto
     else:
         msgs.append({"role": "user", "content": texto})
-    sistema = construir_prompt(CFG.dryclean_precio_base)
+    sistema = construir_sistema(CFG.dryclean_precio_base)
     ctx = {"silenciar": False, "escalado": False}
 
     for _ in range(6):
         resp = claude(sistema, msgs, TOOLS)
         uso = resp.get("usage") or {}
-        log_evento(uid, "uso", extra={"i": uso.get("input_tokens", 0), "o": uso.get("output_tokens", 0)})
+        log_evento(uid, "uso", extra={"i": uso.get("input_tokens", 0), "o": uso.get("output_tokens", 0),
+                                      "c": uso.get("cache_read_input_tokens", 0),
+                                      "w": uso.get("cache_creation_input_tokens", 0)})
         if resp.get("stop_reason") == "tool_use":
             msgs.append({"role": "assistant", "content": resp["content"]})
             resultados = []
