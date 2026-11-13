@@ -376,17 +376,28 @@ def _ok(resp):
 
 
 def _resolver_ambiguo(datos, data):
-    """Si piden libras y entre los candidatos solo uno se cobra por libra, cotiza ese."""
-    if not (isinstance(data, dict) and data.get("candidatos") and "libras" in datos
-            and "producto_id" not in datos):
+    """Resuelve solos los casos donde el nombre coincide con varios productos pero no hay duda:
+    - con libras: si entre los candidatos solo uno se cobra por libra, cotiza ese;
+    - sin libras: si todos son de precio fijo y cuestan lo mismo (ej. un edredón lavado como
+      Solo Lavado o como Full Service), cotiza uno; el precio es el mismo."""
+    if not (isinstance(data, dict) and data.get("candidatos") and "producto_id" not in datos):
         return data
     resp = con_cache("catalogo", lambda: _ok(sistema_get("/api/catalogo")))
     por_id = {p.get("id"): p for p in lista_de_productos(resp[1])} if resp else {}
     ids = [c.get("id") for c in data["candidatos"] if isinstance(c, dict)]
-    por_libra = [i for i in ids if por_id.get(i, {}).get("tipo") == "por_libra"]
-    if len(por_libra) != 1:
-        return data
-    st, nuevo = sistema_post("/api/cotizar", {"producto_id": por_libra[0], "libras": datos["libras"]})
+    prods = [por_id.get(i) for i in ids]
+    if "libras" in datos:
+        por_libra = [i for i in ids if por_id.get(i, {}).get("tipo") == "por_libra"]
+        if len(por_libra) != 1:
+            return data
+        nuevo_datos = {"producto_id": por_libra[0], "libras": datos["libras"]}
+    else:
+        if not ids or any(p is None or p.get("tipo") != "fijo" for p in prods):
+            return data
+        if len({p.get("precio") for p in prods}) != 1:
+            return data
+        nuevo_datos = {"producto_id": ids[0], "cantidad": datos.get("cantidad") or 1}
+    st, nuevo = sistema_post("/api/cotizar", nuevo_datos)
     return nuevo if st == 200 else data
 
 
@@ -632,8 +643,8 @@ def probar_sistema():
     for datos in ({"servicio": "Solo Lavado", "libras": 15},
                   {"servicio": "Full Service", "libras": 15},
                   {"servicio": "Edredon Queen", "cantidad": 1}):
-        st, r = sistema_post("/api/cotizar", datos)
-        print("POST /api/cotizar", datos, "->", st, json.dumps(r, ensure_ascii=False)[:300])
+        r = tool_cotizar(dict(datos))
+        print("cotizar", datos, "->", json.dumps(r, ensure_ascii=False)[:300])
     st, pol = sistema_get("/api/politicas")
     print("GET /api/politicas ->", st, "políticas:", len(pol.get("politicas", [])) if isinstance(pol, dict) else "?")
 

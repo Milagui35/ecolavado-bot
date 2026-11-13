@@ -281,10 +281,26 @@ class TestAmbiguo(Base):
         self.assertTrue(r["ok"])
         self.assertEqual(llamadas[-1], {"producto_id": 68, "libras": 15})
 
-    def test_sin_libras_sigue_ambiguo(self):
+    def _montar(self, precios):
+        cat = {"productos": [{"id": 71, "nombre": "Solo Lavado- Edredon Queen", "tipo": "fijo", "precio": precios[0]},
+                             {"id": 3, "nombre": "FULL SERVICE- Edredon Queen", "tipo": "fijo", "precio": precios[1]}]}
+        llamadas = []
+
         def spost(ruta, datos):
+            llamadas.append(datos)
+            if "producto_id" in datos:
+                return 200, {"ok": True, "total": 250.0 * datos["cantidad"]}
             return 200, {"ok": False, "candidatos": [{"id": 71}, {"id": 3}]}
-        bot.sistema_post = spost
+        bot.sistema_get, bot.sistema_post = (lambda r: (200, cat)), spost
+        return llamadas
+
+    def test_edredon_mismo_precio_se_cotiza_solo(self):
+        llamadas = self._montar([250.0, 250.0])
+        r = bot.tool_cotizar({"servicio": "Edredon Queen", "cantidad": 2})
+        self.assertTrue(r["ok"])
+        self.assertEqual(llamadas[-1], {"producto_id": 71, "cantidad": 2})
+
+    def test_edredon_distinto_precio_sigue_ambiguo(self):
+        self._montar([250.0, 300.0])
         r = bot.tool_cotizar({"servicio": "Edredon Queen", "cantidad": 1})
         self.assertFalse(r["ok"])
-        self.assertEqual(len(r["candidatos"]), 2)
