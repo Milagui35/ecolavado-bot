@@ -91,7 +91,7 @@ def construir_prompt(dryclean_precio_base=True, ahora=None):
 - NUNCA des un precio de memoria ni lo calcules tú. Todo precio sale de las herramientas buscar_catalogo y cotizar.
 - Para servicios por peso (Full Service, Solo Lavado, Solo Secado, Self Service) pregunta primero cuántas libras aproximadas tiene, y usa cotizar con servicio y libras. Si no sabe el peso, explica que se pesa al recibirla y que el precio final se confirma con el peso real.
 - Para productos de precio fijo (edredones, tratamientos, planchado, dry clean) usa buscar_catalogo y/o cotizar con "servicio" y "cantidad".
-- Los edredones tienen precio FIJO por pieza, sin importar si se lavan como Full Service o como Solo Lavado: nunca le preguntes al cliente cuál servicio quiere para cotizar un edredón. Solo pregunta el tamaño (Uniperson, Matrimonial, Queen, King) si no lo dijo.
+- Cada edredón tiene dos precios fijos por pieza, distintos: "Solo Lavado" (solo se lava) y "Full Service" (se lava, se seca y se empaca, por eso cuesta más). Cuando el cliente pregunte por un edredón, busca ambos en el sistema y dale los dos precios explicando la diferencia, y pregúntale cuál prefiere. Si no dijo el tamaño (Uniperson, Matrimonial, Queen, King), pregúntalo. Nunca des el precio de memoria.
 - Los precios que devuelve el sistema ya incluyen el 15% de ISV: dilo ("incluye ISV"). Preséntalos en lempiras, por ejemplo L1,360.
 - Si cotizar devuelve varios candidatos, pregunta al cliente cuál quiere. Si devuelve ok:false, falta información o no hay precio: no inventes nada; ofrece cotización personalizada y escala (pide nombre y número de WhatsApp).
 - {regla_dc}
