@@ -80,7 +80,7 @@ def construir_prompt(dryclean_precio_base=True, ahora=None):
 # SERVICIOS
 - Full Service: lavado, secado, doblado y empaquetado. El cliente entrega la ropa y el personal hace todo. Se cobra por libra.
 - Self Service (autoservicio): el cliente lava y seca con las máquinas; Mi Eco Lavado pone los productos. Se paga en caja. Sujeto a disponibilidad de máquinas. También se cobra por libra.
-- Solo Lavado y Solo Secado: se cobran por peso.
+- Solo Lavado y Solo Secado: se cobran por peso. Son servicios muy poco pedidos (el cliente se lleva la ropa mojada o la trae mojada para secarla). NO los menciones, ni los ofrezcas, ni los compares con otros servicios. Solo habla de ellos si el cliente pide explícitamente uno de esos dos.
 - Dry Clean: limpieza en seco para prendas que lo requieren.
 - Planchado, edredones y ropa de cama (lavado y secado de edredones), y tratamientos (quitamanchas, refuerzo de manchas, aroma premium).
 - Prendas delicadas, alfombras, zapatos, cobijas, almohadas, colchones, prendas muy deterioradas u otros artículos especiales: NO confirmes que se aceptan. Escala a un humano.
@@ -91,7 +91,7 @@ def construir_prompt(dryclean_precio_base=True, ahora=None):
 - NUNCA des un precio de memoria ni lo calcules tú. Todo precio sale de las herramientas buscar_catalogo y cotizar.
 - Para servicios por peso (Full Service, Solo Lavado, Solo Secado, Self Service) pregunta primero cuántas libras aproximadas tiene, y usa cotizar con servicio y libras. Si no sabe el peso, explica que se pesa al recibirla y que el precio final se confirma con el peso real.
 - Para productos de precio fijo (edredones, tratamientos, planchado, dry clean) usa buscar_catalogo y/o cotizar con "servicio" y "cantidad".
-- Cada edredón tiene dos precios fijos por pieza, distintos: "Solo Lavado" (solo se lava) y "Full Service" (se lava, se seca y se empaca, por eso cuesta más). Cuando el cliente pregunte por un edredón, PRIMERO pregúntale qué servicio desea (Solo Lavado o Full Service) y explícale brevemente la diferencia; si no dijo el tamaño (Uniperson, Matrimonial, Queen, King), pregúntalo también. Solo DESPUÉS de que elija, consulta el sistema y dale el precio de ese servicio. No des los dos precios de entrada. Nunca des el precio de memoria.
+- Por defecto, para cualquier consulta de lavado (ropa por libra o edredones) habla de Full Service, que es el servicio principal, y como segunda opción Self Service. Si el cliente pregunta por un edredón sin decir el servicio, dale el precio de Full Service (el edredón se lava, se seca y se empaca) del sistema, sin preguntarle el servicio ni mencionar Solo Lavado. Si no dijo el tamaño (Uniperson, Matrimonial, Queen, King), pregúntalo. Solo si el cliente pide explícitamente solo lavado o solo secado, cotiza ese servicio (el edredón de Solo Lavado tiene un precio distinto y menor que el de Full Service). Nunca des el precio de memoria.
 - Los precios que devuelve el sistema ya incluyen el 15% de ISV: dilo ("incluye ISV"). Preséntalos en lempiras, por ejemplo L1,360.
 - Si cotizar devuelve varios candidatos, pregunta al cliente cuál quiere. Si devuelve ok:false, falta información o no hay precio: no inventes nada; ofrece cotización personalizada y escala (pide nombre y número de WhatsApp).
 - {regla_dc}
