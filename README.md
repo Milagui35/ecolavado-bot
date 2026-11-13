@@ -63,3 +63,19 @@ panel.45-77-119-178.sslip.io {
 ```
 
 Las conversaciones se guardan `LOG_DIAS` días (60 por defecto). Pausar el bot desde el panel no detiene el servicio.
+
+## Botón "Actualizar" del panel
+
+El panel (página **Actualizar**) crea `actualizar.flag`; una unidad `ecolavado-update.path` lo detecta y ejecuta
+`/usr/local/sbin/ecolavado-update` (copia de `update.sh`, propiedad de root), que baja el código como usuario `ecobot`
+(`git pull --ff-only`), revisa que compile y reinicia el bot y el panel. Instalación única:
+
+```
+mkdir -p /home/ecobot/.ssh && cp ~/.ssh/ecobot_deploy ~/.ssh/known_hosts /home/ecobot/.ssh/
+chown -R ecobot:ecobot /home/ecobot/.ssh && chmod 700 /home/ecobot/.ssh && chmod 600 /home/ecobot/.ssh/ecobot_deploy
+install -m 755 -o root -g root /opt/ecolavado-bot/update.sh /usr/local/sbin/ecolavado-update
+cp ecolavado-update.service ecolavado-update.path /etc/systemd/system/
+systemctl daemon-reload && systemctl enable --now ecolavado-update.path
+```
+
+Si se cambia `update.sh`, hay que volver a instalarlo con el comando `install` (no se ejecuta desde la carpeta del bot a propósito).

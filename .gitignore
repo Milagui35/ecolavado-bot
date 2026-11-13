@@ -2,3 +2,7 @@
 *.db
 __pycache__/
 *.pyc
+actualizar.flag
+actualizacion.log
+actualizacion.log.tmp
+__pycache__/

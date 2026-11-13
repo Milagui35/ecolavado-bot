@@ -204,6 +204,38 @@ class TestAcciones(Base):
         self.assertEqual(st, 400)
 
 
+class TestActualizar(Base):
+    def setUp(self):
+        super().setUp()
+        self.entrar()
+        panel.CFG.flag_file = os.path.join(self.dir, "actualizar.flag")
+        panel.CFG.update_log = os.path.join(self.dir, "actualizacion.log")
+
+    def test_pagina_y_log_escapado(self):
+        with open(panel.CFG.update_log, "w", encoding="utf-8") as f:
+            f.write("== x ==\n<b>raro</b>\nRESULTADO: OK a -> b\n")
+        st, _, t = self.pedir("GET", "/actualizar")
+        self.assertEqual(st, 200)
+        self.assertIn("&lt;b&gt;raro&lt;/b&gt;", t)
+        self.assertIn("Actualizar ahora", t)
+
+    def test_boton_crea_bandera_con_csrf(self):
+        st, _, _ = self.pedir("POST", "/actualizar", {"csrf": "mala"})
+        self.assertEqual(st, 403)
+        self.assertFalse(os.path.exists(panel.CFG.flag_file))
+        st, _, _ = self.pedir("POST", "/actualizar", {"csrf": self.csrf()})
+        self.assertEqual(st, 303)
+        self.assertTrue(os.path.exists(panel.CFG.flag_file))
+        st, _, t = self.pedir("GET", "/actualizar")
+        self.assertIn("Actualización en curso", t)
+
+    def test_sin_sesion_no_actualiza(self):
+        self.cookie = None
+        st, _, _ = self.pedir("POST", "/actualizar", {"csrf": "x"}, cookie=False)
+        self.assertEqual(st, 303)
+        self.assertFalse(os.path.exists(panel.CFG.flag_file))
+
+
 class TestMetricas(Base):
     def test_cuentas(self):
         desde, hasta, _, dias = panel.rango_periodo("7")

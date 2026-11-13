@@ -1,0 +1,9 @@
+[Unit]
+Description=Vigila la petición de actualización hecha desde el panel
+
+[Path]
+PathExists=/opt/ecolavado-bot/actualizar.flag
+Unit=ecolavado-update.service
+
+[Install]
+WantedBy=multi-user.target

@@ -20,6 +20,7 @@ import logging
 import math
 import os
 import sqlite3
+import subprocess
 import sys
 import threading
 import time
@@ -65,6 +66,8 @@ class Config:
         self.cookie_secure = env("PANEL_COOKIE_SECURE", "1") == "1"
         self.sistemas_file = env("SISTEMAS_FILE", "sistemas.json")
         self.sesion_dias = 30
+        self.flag_file = env("ACTUALIZAR_FLAG", "actualizar.flag")
+        self.update_log = env("ACTUALIZACION_LOG", "actualizacion.log")
 
 
 CFG = Config()
@@ -480,7 +483,8 @@ text-decoration:none;color:inherit}
 
 def pagina(titulo, cuerpo, activo="", token=None, pausado=False):
     enlaces = [("", "Resumen", "/"), ("chats", "Chats", "/chats"),
-               ("escalaciones", "Escalaciones", "/escalaciones"), ("sistemas", "Mis sistemas", "/sistemas")]
+               ("escalaciones", "Escalaciones", "/escalaciones"), ("sistemas", "Mis sistemas", "/sistemas"),
+               ("actualizar", "Actualizar", "/actualizar")]
     nav = "".join(f'<a href="{u}" class="{"act" if a == activo else ""}">{esc(t)}</a>' for a, t, u in enlaces)
     if token is not None:
         estado = ('<span class="etq aviso">Bot en pausa</span>' if pausado else '<span class="etq ok">Bot activo</span>')
@@ -762,6 +766,45 @@ def vista_sistemas():
     return "Mis sistemas", f'<h1>Mis sistemas</h1>{lista}'
 
 
+def version_actual():
+    """Versión (commit) del código que está corriendo, leída del repositorio local."""
+    try:
+        r = subprocess.run(["git", "log", "-1", "--format=%h|%s|%ct"], capture_output=True, text=True,
+                           timeout=5, cwd=os.path.dirname(os.path.abspath(__file__)))
+        h, asunto, ts = r.stdout.strip().split("|", 2)
+        return h, asunto, int(ts)
+    except Exception:
+        return None
+
+
+def vista_actualizar(token, mensaje=""):
+    v = version_actual()
+    ver = (f'<p>Versión instalada: <strong>{esc(v[0])}</strong> · {esc(v[1])} '
+           f'<span class="nota">({esc(fmt_ts(v[2]))})</span></p>') if v else \
+        '<p class="nota">No se pudo leer la versión instalada.</p>'
+    en_curso = os.path.exists(CFG.flag_file)
+    try:
+        with open(CFG.update_log, encoding="utf-8", errors="replace") as f:
+            log_txt = "".join(f.readlines()[-40:])
+    except OSError:
+        log_txt = "Todavía no se ha actualizado desde el panel."
+    ultimo = "OK" if "RESULTADO: OK" in log_txt.split("== ")[-1] else ("ERROR" if "RESULTADO: ERROR" in log_txt.split("== ")[-1] else "")
+    etq = {"OK": '<span class="etq ok">Última actualización: correcta</span>',
+           "ERROR": '<span class="etq mal">Última actualización: falló</span>'}.get(ultimo, "")
+    aviso = f'<div class="panel"><strong>{esc(mensaje)}</strong></div>' if mensaje else ""
+    if en_curso:
+        aviso = '<div class="panel esc"><strong>Actualización en curso…</strong> Recargue la página en unos 20 segundos.</div>'
+    boton = (f'<form method="post" action="/actualizar"><input type="hidden" name="csrf" value="{csrf_de(token)}">'
+             f'<button class="pri" type="submit"{" disabled" if en_curso else ""}>Actualizar ahora</button></form>')
+    cuerpo = (f'<h1>Actualizar el bot</h1>{aviso}<div class="panel">{ver}'
+              f'<p class="nota">Baja la última versión del código desde GitHub y reinicia el bot y el panel. '
+              f'Si el código nuevo tiene errores de sintaxis, no se aplica y todo sigue como estaba. '
+              f'El panel se reinicia al final, así que la página puede tardar unos segundos en volver.</p>'
+              f'{boton}</div><div class="panel"><h2>Registro de la última actualización {etq}</h2>'
+              f'<pre style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;margin:0">{esc(log_txt)}</pre></div>')
+    return "Actualizar", cuerpo
+
+
 # --------------------------------------------------------------------------
 # Servidor
 # --------------------------------------------------------------------------
@@ -873,6 +916,9 @@ class Handler(BaseHTTPRequestHandler):
                 elif ruta == "/sistemas":
                     titulo, cuerpo = vista_sistemas()
                     activo = "sistemas"
+                elif ruta == "/actualizar":
+                    titulo, cuerpo = vista_actualizar(tok, q.get("m", ""))
+                    activo = "actualizar"
                 else:
                     return self.enviar(404, pagina("No encontrado", "<h1>No encontrado</h1>", "", tok, False))
                 pausado = self.pausado(con)
@@ -906,6 +952,13 @@ class Handler(BaseHTTPRequestHandler):
                 con.execute("INSERT OR REPLACE INTO ajustes(clave, valor) VALUES ('pausado', ?)",
                             ("1" if datos.get("valor") == "1" else "0",))
             return self.redirigir("/")
+        if ruta == "/actualizar":
+            try:
+                with open(CFG.flag_file, "w", encoding="utf-8") as f:
+                    f.write(str(int(time.time())))
+            except OSError:
+                return self.redirigir("/actualizar?m=" + urllib.parse.quote("No se pudo pedir la actualización (permisos)."))
+            return self.redirigir("/actualizar")
         if ruta == "/accion":
             uid, accion = datos.get("uid", ""), datos.get("accion", "")
             if not uid or accion not in ("atendido", "reanudar", "bloquear", "desbloquear"):

@@ -1,0 +1,6 @@
+[Unit]
+Description=Actualizar el bot de Mi Eco Lavado desde GitHub
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/ecolavado-update
