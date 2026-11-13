@@ -179,7 +179,9 @@ class TestHerramientas(Base):
         self.assertIn("no dar precio", r["aviso"])
 
     def test_politicas(self):
-        self.assertEqual(bot.tool_politicas()["politicas"][0]["numero"], 1)
+        r = bot.tool_politicas()
+        self.assertTrue(r["ok"])
+        self.assertIn("Revise su ropa.", r["politicas"])
 
     def test_sistema_caido(self):
         bot.sistema_get = lambda r: (500, {})

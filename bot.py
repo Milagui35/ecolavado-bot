@@ -385,7 +385,8 @@ def tool_cotizar(args):
         log.error("El token del bot fue rechazado por el sistema (%s)", st)
         return {"ok": False, "error": "Sistema de precios no disponible."}
     if isinstance(data, dict) and not CFG.dryclean_precio_base and data.get("es_precio_base"):
-        data = {k: v for k, v in data.items() if not CLAVES_PRECIO.search(k)}
+        data = {k: v for k, v in data.items()
+                if not CLAVES_PRECIO.search(k) and k != "desglose"}
         data["aviso"] = "Dry Clean: no dar precio; se valora en persona en la lavandería."
     return data
 
@@ -394,7 +395,14 @@ def tool_politicas():
     resp = con_cache("politicas", lambda: _ok(sistema_get("/api/politicas")))
     if not resp:
         return {"ok": False, "error": "No se pudieron leer las políticas."}
-    return resp[1]
+    data = resp[1] if isinstance(resp[1], dict) else {}
+    texto = data.get("texto_completo")
+    if not texto:
+        texto = "\n".join(f"{p.get('numero', '')}. {p.get('texto', '')}"
+                          for p in data.get("politicas", []) if isinstance(p, dict))
+    if not texto:
+        return {"ok": False, "error": "No se pudieron leer las políticas."}
+    return {"ok": True, "politicas": texto}
 
 
 def tool_escalar(uid, args, ctx):
