@@ -215,7 +215,7 @@ def sistema_post(ruta, datos):
 
 
 def claude(system, messages, tools):
-    body = {"model": CFG.modelo, "max_tokens": 600, "system": system,
+    body = {"model": CFG.modelo, "max_tokens": 1000, "system": system,
             "messages": messages, "tools": tools}
     st, resp = http_json("https://api.anthropic.com/v1/messages", body, timeout=60, headers={
         "x-api-key": CFG.anthropic_key, "anthropic-version": "2023-06-01"})
@@ -503,6 +503,7 @@ def responder(uid, texto):
         if ctx["silenciar"]:
             return None
         out = "".join(b.get("text", "") for b in resp["content"] if b.get("type") == "text").strip()
+        log.info("Respuesta de Claude: %s caracteres, stop_reason=%s", len(out), resp.get("stop_reason"))
         return out or None
     return MSG_FALLA
 
