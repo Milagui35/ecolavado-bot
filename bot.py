@@ -74,7 +74,7 @@ class Config:
         self.bot_token = env("BOT_TOKEN")
         self.telegram_token = env("TELEGRAM_BOT_TOKEN")
         self.telegram_chat = env("TELEGRAM_CHAT_ID")
-        self.max_msgs_dia = int(env("MAX_MSGS_DIA", "30"))
+        self.max_msgs_dia = int(env("MAX_MSGS_DIA", "20"))
         self.handoff_horas = float(env("HANDOFF_HORAS", "12"))
         self.dryclean_precio_base = env("DRYCLEAN_PRECIO_BASE", "1") == "1"
         self.db_path = env("DB_PATH", "bot.db")
@@ -89,6 +89,9 @@ AVISO_MEDIA = ("Recibimos su archivo. Una persona de nuestro equipo lo revisará
                f"Si es urgente, puede escribirnos o llamarnos al WhatsApp {CFG.telefono}.")
 MSG_FALLA = (f"Disculpe, en este momento no puedo responderle. Por favor comuníquese con nuestro "
              f"personal al WhatsApp o llamada {CFG.telefono}. Con gusto le atenderemos.")
+
+MSG_LIMITE = ("Hemos llegado al límite de mensajes de este chat por hoy. Para seguir con su consulta, "
+              "escríbanos o llámenos al WhatsApp +504 3227-5543, con mucho gusto le atenderemos. ¡Gracias por escribirnos!")
 
 # --------------------------------------------------------------------------
 # Base de datos local (historial corto, duplicados, límites)
@@ -600,9 +603,21 @@ def procesar_evento(ev):
         u = usuario(uid)
         if u["bloqueado"]:
             return
-        if contar_hoy(uid) > CFG.max_msgs_dia:
+        n_hoy = contar_hoy(uid)
+        if n_hoy > CFG.max_msgs_dia:
             log.info("Límite diario alcanzado para %s", uid)
             log_evento(uid, "limite")
+            return
+        if n_hoy == CFG.max_msgs_dia:
+            # Último mensaje del día: no se llama a la IA, se le indica cómo seguir por WhatsApp.
+            log.info("Último mensaje del día para %s: se envía el aviso de WhatsApp", uid)
+            texto_in = (msg.get("text") or "").strip()
+            if texto_in:
+                log_evento(uid, "in", texto_in)
+            log_evento(uid, "limite", "ultimo")
+            if enviar_ig(uid, MSG_LIMITE):
+                guardar_msg(uid, "assistant", MSG_LIMITE)
+                log_evento(uid, "out", MSG_LIMITE)
             return
 
         texto = (msg.get("text") or "").strip()

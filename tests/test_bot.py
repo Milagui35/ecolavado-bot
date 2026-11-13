@@ -124,11 +124,15 @@ class TestFlujo(Base):
         self.assertEqual([m["role"] for m in msgs], ["user", "assistant", "user"])
 
     def test_limite_diario(self):
-        bot.CFG.max_msgs_dia = 2
-        self.claude_script = [self.texto("1"), self.texto("2"), self.texto("3")]
-        for i in range(4):
+        bot.CFG.max_msgs_dia = 3
+        self.claude_script = [self.texto("1"), self.texto("2"), self.texto("NO DEBE USARSE")]
+        for i in range(5):
             bot.procesar_evento(self.evento(texto=f"m{i}"))
-        self.assertEqual(len(self.enviados), 2)
+        # 2 respuestas normales + 1 último mensaje con el WhatsApp; después, silencio
+        self.assertEqual(len(self.enviados), 3)
+        self.assertEqual([e[1] for e in self.enviados[:2]], ["1", "2"])
+        self.assertEqual(self.enviados[2][1], bot.MSG_LIMITE)
+        self.assertIn("+504 3227-5543", self.enviados[2][1])
 
     def test_bloqueado(self):
         bot.set_usuario("u1", bloqueado=1)
