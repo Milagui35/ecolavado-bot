@@ -688,6 +688,10 @@ class Handler(BaseHTTPRequestHandler):
             if ok:
                 return self._responder(200, q.get("hub.challenge", [""])[0].encode())
             return self._responder(403, b"verificacion fallida")
+        if url.path in ("/privacidad", "/eliminar-datos"):
+            import legal
+            pagina = legal.PRIVACIDAD if url.path == "/privacidad" else legal.ELIMINAR
+            return self._responder(200, pagina.encode("utf-8"), "text/html; charset=utf-8")
         self._responder(404, b"no encontrado")
 
     def do_POST(self):
