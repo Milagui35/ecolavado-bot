@@ -375,6 +375,21 @@ def _ok(resp):
     return (st, data) if st == 200 else None
 
 
+def _resolver_ambiguo(datos, data):
+    """Si piden libras y entre los candidatos solo uno se cobra por libra, cotiza ese."""
+    if not (isinstance(data, dict) and data.get("candidatos") and "libras" in datos
+            and "producto_id" not in datos):
+        return data
+    resp = con_cache("catalogo", lambda: _ok(sistema_get("/api/catalogo")))
+    por_id = {p.get("id"): p for p in lista_de_productos(resp[1])} if resp else {}
+    ids = [c.get("id") for c in data["candidatos"] if isinstance(c, dict)]
+    por_libra = [i for i in ids if por_id.get(i, {}).get("tipo") == "por_libra"]
+    if len(por_libra) != 1:
+        return data
+    st, nuevo = sistema_post("/api/cotizar", {"producto_id": por_libra[0], "libras": datos["libras"]})
+    return nuevo if st == 200 else data
+
+
 def tool_cotizar(args):
     datos = {k: v for k, v in args.items()
              if k in ("servicio", "libras", "cantidad", "producto_id") and v not in (None, "")}
@@ -384,6 +399,7 @@ def tool_cotizar(args):
     if st in (401, 403):
         log.error("El token del bot fue rechazado por el sistema (%s)", st)
         return {"ok": False, "error": "Sistema de precios no disponible."}
+    data = _resolver_ambiguo(datos, data)
     if isinstance(data, dict) and not CFG.dryclean_precio_base and data.get("es_precio_base"):
         data = {k: v for k, v in data.items()
                 if not CLAVES_PRECIO.search(k) and k != "desglose"}

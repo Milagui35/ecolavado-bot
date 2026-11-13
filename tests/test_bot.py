@@ -257,3 +257,34 @@ class TestUtilidades(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class TestAmbiguo(Base):
+    def test_libras_resuelve_unico_por_libra(self):
+        cat = {"productos": [
+            {"id": 68, "nombre": "Solo Lavado LBS", "tipo": "por_libra"},
+            {"id": 71, "nombre": "Solo Lavado- Edredon Queen", "tipo": "fijo", "precio": 250.0}]}
+        llamadas = []
+
+        def sget(ruta):
+            return 200, cat
+
+        def spost(ruta, datos):
+            llamadas.append(datos)
+            if "producto_id" in datos:
+                return 200, {"ok": True, "producto": "Solo Lavado LBS", "total": 375.0}
+            return 200, {"ok": False, "error": "Hay varios servicios que coinciden; indique cuál.",
+                         "candidatos": [{"id": 68, "nombre": "Solo Lavado LBS"},
+                                        {"id": 71, "nombre": "Solo Lavado- Edredon Queen"}]}
+        bot.sistema_get, bot.sistema_post = sget, spost
+        r = bot.tool_cotizar({"servicio": "Solo Lavado", "libras": 15})
+        self.assertTrue(r["ok"])
+        self.assertEqual(llamadas[-1], {"producto_id": 68, "libras": 15})
+
+    def test_sin_libras_sigue_ambiguo(self):
+        def spost(ruta, datos):
+            return 200, {"ok": False, "candidatos": [{"id": 71}, {"id": 3}]}
+        bot.sistema_post = spost
+        r = bot.tool_cotizar({"servicio": "Edredon Queen", "cantidad": 1})
+        self.assertFalse(r["ok"])
+        self.assertEqual(len(r["candidatos"]), 2)
