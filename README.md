@@ -49,3 +49,17 @@ Cree un bot con @BotFather (da `TELEGRAM_BOT_TOKEN`), escríbale un mensaje y ab
 - Sanitización de prendas: no existe como producto; el bot no la cotiza y escala.
 - El monto del recargo por almacenamiento (desde el día 15) no está definido: el bot dice que se consulta en tienda.
 - Autoservicio de 91 a 100 libras está pendiente en el sistema.
+
+## Panel web
+
+`panel.py` es un servicio aparte (`ecolavado-panel.service`, puerto 8082) que lee la misma base de datos del bot.
+Muestra métricas, chats, escalaciones pendientes y la lista de sistemas (`sistemas.json`).
+Acceso con contraseña (`PANEL_PASSWORD` en `.env`), sin JavaScript, solo HTTPS vía Caddy:
+
+```
+panel.45-77-119-178.sslip.io {
+    reverse_proxy 127.0.0.1:8082
+}
+```
+
+Las conversaciones se guardan `LOG_DIAS` días (60 por defecto). Pausar el bot desde el panel no detiene el servicio.

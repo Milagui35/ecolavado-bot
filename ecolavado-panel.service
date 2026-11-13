@@ -1,0 +1,14 @@
+[Unit]
+Description=Panel web del bot de Instagram - Mi Eco Lavado
+After=network-online.target
+
+[Service]
+WorkingDirectory=/opt/ecolavado-bot
+ExecStart=/usr/bin/python3 /opt/ecolavado-bot/panel.py
+Restart=always
+RestartSec=5
+User=ecobot
+# Lee el mismo .env y la misma base de datos que el bot. Escucha solo en 127.0.0.1 (Caddy le da el HTTPS).
+
+[Install]
+WantedBy=multi-user.target

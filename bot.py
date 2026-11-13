@@ -79,6 +79,7 @@ class Config:
         self.dryclean_precio_base = env("DRYCLEAN_PRECIO_BASE", "1") == "1"
         self.db_path = env("DB_PATH", "bot.db")
         self.bot_activo = env("BOT_ACTIVO", "1") == "1"
+        self.log_dias = int(env("LOG_DIAS", "60"))  # días que se conserva el registro del panel
         self.telefono = "+504 3227-5543"
 
 
@@ -113,7 +114,15 @@ def init_db():
             uid TEXT PRIMARY KEY, fuera_tema INTEGER DEFAULT 0, handoff_hasta REAL DEFAULT 0,
             bloqueado INTEGER DEFAULT 0, aviso_media_ts REAL DEFAULT 0);
         CREATE TABLE IF NOT EXISTS diario (uid TEXT, dia TEXT, n INTEGER, PRIMARY KEY (uid, dia));
+        -- Registro para el panel de métricas (se conserva LOG_DIAS días)
+        CREATE TABLE IF NOT EXISTS registro (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, uid TEXT, tipo TEXT, texto TEXT, extra TEXT);
+        CREATE INDEX IF NOT EXISTS ix_reg_ts ON registro(ts);
+        CREATE INDEX IF NOT EXISTS ix_reg_uid ON registro(uid, ts);
+        CREATE TABLE IF NOT EXISTS perfiles (uid TEXT PRIMARY KEY, nombre TEXT, usuario TEXT, ts REAL);
+        CREATE TABLE IF NOT EXISTS ajustes (clave TEXT PRIMARY KEY, valor TEXT);
         """)
+        con.execute("PRAGMA journal_mode=WAL")
 
 
 def purgar():
@@ -124,6 +133,45 @@ def purgar():
         con.execute("DELETE FROM vistos WHERE ts < ?", (limite,))
         con.execute("DELETE FROM diario WHERE dia < ?",
                     ((ahora_hn() - timedelta(days=3)).strftime("%Y-%m-%d"),))
+    if CFG.log_dias > 0:
+        with _db_lock, db() as con:
+            con.execute("DELETE FROM registro WHERE ts < ?", (time.time() - CFG.log_dias * 86400,))
+
+
+def log_evento(uid, tipo, texto="", extra=None):
+    """Guarda un evento para el panel. Nunca debe romper la conversación."""
+    try:
+        with _db_lock, db() as con:
+            con.execute("INSERT INTO registro(ts, uid, tipo, texto, extra) VALUES (?, ?, ?, ?, ?)",
+                        (time.time(), uid, tipo, texto or "",
+                         json.dumps(extra, ensure_ascii=False) if extra is not None else None))
+    except Exception:
+        log.exception("No se pudo guardar el evento %s", tipo)
+
+
+def get_ajuste(clave, defecto=""):
+    with _db_lock, db() as con:
+        f = con.execute("SELECT valor FROM ajustes WHERE clave = ?", (clave,)).fetchone()
+    return f["valor"] if f else defecto
+
+
+def guardar_perfil(uid):
+    """Trae el nombre y usuario de Instagram del cliente (si Meta lo permite)."""
+    try:
+        with _db_lock, db() as con:
+            if con.execute("SELECT 1 FROM perfiles WHERE uid = ?", (uid,)).fetchone():
+                return
+        url = (f"{CFG.ig_api_base}/{CFG.ig_graph_version}/{urllib.parse.quote(uid)}"
+               "?fields=name,username")
+        st, r = http_json(url, headers={"Authorization": f"Bearer {CFG.ig_access_token}"}, timeout=10)
+        nombre, usuario_ig = (r.get("name") or ""), (r.get("username") or "")
+        if st != 200:
+            log.info("Sin perfil para %s (%s)", uid, st)
+        with _db_lock, db() as con:
+            con.execute("INSERT OR REPLACE INTO perfiles(uid, nombre, usuario, ts) VALUES (?, ?, ?, ?)",
+                        (uid, nombre, usuario_ig, time.time()))
+    except Exception:
+        log.exception("Error al traer el perfil")
 
 
 def ya_visto(mid):
@@ -443,10 +491,13 @@ def tool_escalar(uid, args, ctx):
         f"Origen: Instagram (ID de la conversación: {uid})\n\n"
         "Requiere seguimiento por parte del personal."
     )
+    detalle = {k: args.get(k) for k in ("nombre", "contacto", "motivo", "servicio", "resumen")}
     if telegram(texto):
         set_usuario(uid, handoff_hasta=time.time() + CFG.handoff_horas * 3600)
         ctx["escalado"] = True
+        log_evento(uid, "escalado", args.get("motivo") or "", {**detalle, "aviso": True})
         return {"enviado": True}
+    log_evento(uid, "escalado", args.get("motivo") or "", {**detalle, "aviso": False})
     log.error("No se pudo enviar el aviso de escalamiento")
     return {"enviado": False,
             "instruccion": f"NO digas que se envió. Dale al cliente el {CFG.telefono}."}
@@ -455,9 +506,16 @@ def tool_escalar(uid, args, ctx):
 def ejecutar_tool(nombre, args, uid, ctx):
     try:
         if nombre == "buscar_catalogo":
+            log_evento(uid, "busco", args.get("consulta", ""))
             return tool_buscar_catalogo(args.get("consulta", ""))
         if nombre == "cotizar":
-            return tool_cotizar(args)
+            r = tool_cotizar(args)
+            if isinstance(r, dict):
+                log_evento(uid, "cotizo", args.get("servicio") or "", {
+                    "ok": bool(r.get("ok")), "producto": r.get("producto"), "tipo": r.get("tipo"),
+                    "libras": args.get("libras"), "cantidad": args.get("cantidad"),
+                    "total": r.get("total")})
+            return r
         if nombre == "obtener_politicas":
             return tool_politicas()
         if nombre == "escalar_a_humano":
@@ -465,6 +523,7 @@ def ejecutar_tool(nombre, args, uid, ctx):
         if nombre == "marcar_fuera_de_tema":
             n = usuario(uid)["fuera_tema"] + 1
             set_usuario(uid, fuera_tema=n)
+            log_evento(uid, "fuera_tema", extra={"veces": n})
             if n >= 2:
                 ctx["silenciar"] = True
             return {"veces": n, "silenciar": n >= 2}
@@ -490,6 +549,8 @@ def responder(uid, texto):
 
     for _ in range(6):
         resp = claude(sistema, msgs, TOOLS)
+        uso = resp.get("usage") or {}
+        log_evento(uid, "uso", extra={"i": uso.get("input_tokens", 0), "o": uso.get("output_tokens", 0)})
         if resp.get("stop_reason") == "tool_use":
             msgs.append({"role": "assistant", "content": resp["content"]})
             resultados = []
@@ -531,8 +592,8 @@ def procesar_evento(ev):
              len(msg.get("attachments") or []))
     if not uid or ya_visto(msg.get("mid")):
         return
-    if not CFG.bot_activo:
-        log.info("BOT_ACTIVO está apagado: no se responde")
+    if not CFG.bot_activo or get_ajuste("pausado") == "1":
+        log.info("Bot pausado: no se responde")
         return
 
     with lock_de(uid):
@@ -541,17 +602,21 @@ def procesar_evento(ev):
             return
         if contar_hoy(uid) > CFG.max_msgs_dia:
             log.info("Límite diario alcanzado para %s", uid)
+            log_evento(uid, "limite")
             return
 
         texto = (msg.get("text") or "").strip()
         if not texto:
             tipos = {a.get("type") for a in (msg.get("attachments") or [])}
+            log_evento(uid, "media", ",".join(sorted(t for t in tipos if t)))
             if tipos & TIPOS_MEDIA and not (tipos & TIPOS_IGNORADOS) \
                     and time.time() - u["aviso_media_ts"] > 6 * 3600:
                 set_usuario(uid, aviso_media_ts=time.time())
                 enviar_ig(uid, AVISO_MEDIA)
             return  # reels, stickers, publicaciones compartidas: se ignoran
 
+        log_evento(uid, "in", texto)
+        threading.Thread(target=guardar_perfil, args=(uid,), daemon=True).start()
         if u["handoff_hasta"] > time.time():
             log.info("Silencio por atención humana para %s", uid)
             return  # ya lo está atendiendo una persona
@@ -559,12 +624,16 @@ def procesar_evento(ev):
         guardar_msg(uid, "user", texto)
         try:
             respuesta = responder(uid, texto)
-        except Exception:
+        except Exception as e:
             log.exception("Fallo al generar respuesta para %s", uid)
+            log_evento(uid, "error", "claude", {"detalle": str(e)[:200]})
             respuesta = MSG_FALLA
         if respuesta:
             if enviar_ig(uid, respuesta):
                 guardar_msg(uid, "assistant", respuesta)
+                log_evento(uid, "out", respuesta)
+            else:
+                log_evento(uid, "error", "envio", {"detalle": "Instagram rechazó el envío"})
 
 
 def procesar_payload(payload):

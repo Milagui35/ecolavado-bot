@@ -36,6 +36,7 @@ class Base(unittest.TestCase):
         self.avisos = []
         self.llamadas_sistema = []
         self.claude_script = []
+        bot.guardar_perfil = lambda uid: None
         bot.enviar_ig = lambda uid, t: (self.enviados.append((uid, t)) or True)
         bot.telegram = lambda t: (self.avisos.append(t) or True)
 
@@ -313,3 +314,32 @@ class TestFormatoAlterno(Base):
         bot.procesar_payload({"object": "instagram", "entry": [
             {"changes": [{"field": "messages", "value": ev}]}]})
         self.assertEqual(self.enviados[0][1], "Hola, bienvenido.")
+
+
+class TestRegistro(Base):
+    def tipos(self):
+        with bot.db() as con:
+            return [f["tipo"] for f in con.execute("SELECT tipo FROM registro ORDER BY id")]
+
+    def test_registra_entrada_salida_y_uso(self):
+        self.claude_script = [dict(self.texto("Con gusto."), usage={"input_tokens": 10, "output_tokens": 5})]
+        bot.procesar_evento(self.evento(texto="Hola"))
+        self.assertIn("in", self.tipos())
+        self.assertIn("out", self.tipos())
+        self.assertIn("uso", self.tipos())
+
+    def test_pausa_global_no_responde(self):
+        with bot.db() as con:
+            con.execute("INSERT OR REPLACE INTO ajustes(clave, valor) VALUES ('pausado', '1')")
+        bot.procesar_evento(self.evento(texto="Hola"))
+        self.assertEqual(self.enviados, [])
+
+    def test_purga_registro_viejo(self):
+        bot.CFG.log_dias = 1
+        with bot.db() as con:
+            con.execute("INSERT INTO registro(ts, uid, tipo) VALUES (?, 'x', 'in')", (time.time() - 5 * 86400,))
+        bot.log_evento("y", "in", "reciente")
+        bot.purgar()
+        with bot.db() as con:
+            n = con.execute("SELECT COUNT(*) c FROM registro").fetchone()["c"]
+        self.assertEqual(n, 1)

@@ -1,0 +1,10 @@
+[
+  {"nombre": "Mi Eco Lavado: sistema de la lavandería", "url": "https://64-177-50-255.sslip.io",
+   "descripcion": "Punto de venta, catálogo, ajustes y actualizaciones de la lavandería.", "servidor": "Vultr 64.177.50.255"},
+  {"nombre": "Bara Concept Store", "url": "https://bara.64-177-50-255.sslip.io/",
+   "descripcion": "Inventario, ventas y finanzas de Bara.", "servidor": "Vultr 64.177.50.255"},
+  {"nombre": "Tracker de empleados (Grupo Águila)", "url": "https://tracker.45-77-119-178.sslip.io/",
+   "descripcion": "Tareas y chat interno del equipo, con WhatsApp.", "servidor": "Vultr 45.77.119.178 (apps nuevas)"},
+  {"nombre": "Panel del bot de Instagram", "url": "https://panel.45-77-119-178.sslip.io/",
+   "descripcion": "Métricas, chats y escalaciones del bot de @miecolavado.", "servidor": "Vultr 45.77.119.178 (apps nuevas)"}
+]
