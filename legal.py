@@ -41,3 +41,26 @@ ELIMINAR = _BASE.format(titulo="Eliminación de datos", cuerpo="""
 <p>Los datos se eliminan de todas formas de forma automática: el contexto a los 3 días y el historial de atención
 a los 60 días.</p>
 """)
+
+TERMINOS = _BASE.format(titulo="Términos del servicio", cuerpo="""
+<h1>Términos del servicio</h1>
+<p>Estos términos aplican al uso del asistente virtual de Mi Eco Lavado en Instagram (@miecolavado).
+Última actualización: noviembre de 2026.</p>
+<h2>Qué es el asistente</h2>
+<p>Es un asistente automático que responde consultas generales sobre nuestros servicios, precios, horarios y
+ubicación. Sus respuestas son informativas.</p>
+<h2>Precios y servicios</h2>
+<p>Los precios que el asistente indica son referenciales y se confirman al momento de recibir la ropa, según el peso
+real o la prenda. Las condiciones de cada orden se rigen por las políticas de Mi Eco Lavado vigentes en la
+lavandería.</p>
+<h2>Atención de una persona</h2>
+<p>Para reclamos, reembolsos, solicitudes especiales o cualquier asunto que requiera autorización, nuestro
+personal le atenderá por WhatsApp al +504 3227-5543. El asistente no puede aceptar ni resolver reclamos.</p>
+<h2>Uso adecuado</h2>
+<p>Le pedimos usar el servicio de forma respetuosa. Podemos dejar de responder a cuentas que envíen spam o
+contenido abusivo.</p>
+<h2>Privacidad</h2>
+<p>El manejo de su información se explica en nuestra <a href="/privacidad">política de privacidad</a>.</p>
+<h2>Contacto</h2>
+<p>WhatsApp / teléfono: +504 3227-5543 · Instagram: @miecolavado</p>
+""")

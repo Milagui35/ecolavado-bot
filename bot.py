@@ -688,9 +688,10 @@ class Handler(BaseHTTPRequestHandler):
             if ok:
                 return self._responder(200, q.get("hub.challenge", [""])[0].encode())
             return self._responder(403, b"verificacion fallida")
-        if url.path in ("/privacidad", "/eliminar-datos"):
+        if url.path in ("/privacidad", "/eliminar-datos", "/terminos"):
             import legal
-            pagina = legal.PRIVACIDAD if url.path == "/privacidad" else legal.ELIMINAR
+            pagina = {"/privacidad": legal.PRIVACIDAD, "/eliminar-datos": legal.ELIMINAR,
+                      "/terminos": legal.TERMINOS}[url.path]
             return self._responder(200, pagina.encode("utf-8"), "text/html; charset=utf-8")
         self._responder(404, b"no encontrado")
 
